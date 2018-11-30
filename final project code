@@ -1,0 +1,214 @@
+# Simple example of sending and receiving values from Adafruit IO with the REST
+# API client.
+# Author: Tony DiCola
+
+# Import Adafruit IO REST client.
+from Adafruit_IO import Client
+import RPi.GPIO as GPIO
+import time
+import Netmaxiot
+import sys
+import math
+
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(17,GPIO.OUT)
+GPIO.setup(27,GPIO.OUT)
+
+# Set to your Adafruit IO key.
+ADAFRUIT_IO_KEY = '1c92d3c0b0ea429b88236f60683a5540'
+
+# Create an instance of the REST client.
+aio = Client(ADAFRUIT_IO_KEY)
+
+# Send a value to the feed 'Test'.  This will create the feed if it doesn't
+# exist already.
+#aio.send('FAN', 40)###########################################################################################create new feeds
+
+# Send a string value 'bar' to the feed 'Foo', again creating it if it doesn't 
+# exist already.
+#aio.send('LED', 0)
+
+# Now read the most recent value from the feed 'Test'.  Notice that it comes
+# back as a string and should be converted to an int if performing calculations
+# on it.
+#data = aio.receive('FAN')
+##print('Retrieved value from Test has attributes: {0}'.format(data))
+#fan=format(data.value)
+#print('Latest value from Test: {0}'.format(data.value))
+
+# Finally read the most revent value from feed 'Foo'.
+#data = aio.receive('LED')
+#print('Retrieved value from Foo has attributes: {0}'.format(data))
+#led=format(data.value)
+#print('Latest value from Foo: {0}'.format(data.value))
+
+
+#################################
+def buttons():
+	#LED Turn ON /OFF
+	data = aio.receive('LED')
+	led=format(data.value)
+	#print light_value
+	print "LIGHT STATUS :"+str(led)
+	if led == "ON" :
+		GPIO.output(17,1)
+		#print "led on ho gai ha check karo"
+	else :
+		GPIO.output(17,0)
+		#print "led band ho gai ha 000000000"
+	data = aio.receive('FAN')
+	fan=format(data.value)
+	#print light_value
+	print "FAN STATUS :"+str(fan)
+	if fan == "ON" :
+		GPIO.output(27,1)
+		#print "led on ho gai ha check karo"
+	else :
+		GPIO.output(27,0)
+		#print "led band ho gai ha 000000000"
+def smoke_detector():
+	z1=0
+	mq_135 = 2	
+	RL_VALUE                     = 10      # define the load resistance on the board, in kilo ohms
+	RO_CLEAN_AIR_FACTOR          = 9.83     # RO_CLEAR_AIR_FACTOR=(Sensor resistance in clean air)/RO,
+	                                            # which is derived from the chart in datasheet    ######################### Software Related Macros #########################
+	CALIBARAION_SAMPLE_TIMES     = 50       # define how many samples you are going to take in the calibration phase
+	CALIBRATION_SAMPLE_INTERVAL  = 5      # define the time interal(in milisecond) between each samples in the
+	                                            # cablibration phase
+	READ_SAMPLE_INTERVAL         = 50       # define how many samples you are going to take in normal operation
+	READ_SAMPLE_TIMES            = 50        # define the time interal(in milisecond) between each samples in 
+	                                            # normal operation
+	    ######################### Application Related Macros ######################
+	GAS_LPG                      = 0
+	GAS_CO                       = 1
+	GAS_SMOKE                    = 2
+	GAS_CO2                      = 3
+	GAS_COX                      = 4
+
+	LPGCurve = [2.3,0.21,-0.47]    # two points are taken from the curve. 
+	                                            # with these two points, a line is formed which is "approximately equivalent"
+	                                            # to the original curve. 
+	                                            # data format:{ x, y, slope}; point1: (lg200, 0.21), point2: (lg10000, -0.59) 
+	COCurve = [2.3,0.72,-0.34]     # two points are taken from the curve. 
+	                                            # with these two points, a line is formed which is "approximately equivalent" 
+	                                            # to the original curve.
+	                                            # data format:[ x, y, slope]; point1: (lg200, 0.72), point2: (lg10000,  0.15)
+	SmokeCurve =[2.3,0.53,-0.44]   # two points are taken from the curve. 
+	                                            # with these two points, a line is formed which is "approximately equivalent" 
+	                                            # to the original curve.
+	                                            # data format:[ x, y, slope]; point1: (lg200, 0.53), point2: (lg10000,  -0.22)  
+	CO2Curve = [2.3,0.50,-0.45]   # two points are taken from the curve.  mq 135 sensor 
+
+
+	COxCurve = [2.3,0.73,-0.43]  
+
+	Ro = 0
+	Ro2 = 0
+
+	raw_adc1 = Netmaxiot.analogRead(mq_135)
+
+	def MQResistanceCalculation(mq_pin):        
+		raw_adc = Netmaxiot.analogRead(mq_pin)        
+		time.sleep(0.03)         
+		ax = float(RL_VALUE*(1023.0-raw_adc)/float(raw_adc));
+		return ax
+	def MQRead(mq_pin):        
+		rs = 0.0
+		for i in range(READ_SAMPLE_TIMES):            
+			rs += MQResistanceCalculation(mq_pin)
+			time.sleep(READ_SAMPLE_INTERVAL/1000.0)
+			rs = rs/READ_SAMPLE_TIMES
+			return rs
+	def MQResistanceCalculation_mq_135(mq_135):
+		raw_adc1 = Netmaxiot.analogRead(mq_135)
+		time.sleep(0.03)        
+		ax1 = float(RL_VALUE*(1023.0-raw_adc1)/float(raw_adc1))
+		return ax1 
+	def MQCalibration_mq_135(mq_135):
+		val1 = 0.0
+		for i in range(CALIBARAION_SAMPLE_TIMES):             
+			val1 += MQResistanceCalculation(Netmaxiot.analogRead(mq_135))
+			time.sleep(CALIBRATION_SAMPLE_INTERVAL/1000.0)
+			time.sleep(0.1)
+			val1 = val1/CALIBARAION_SAMPLE_TIMES                 # calculate the average value
+			val1 = val1/RO_CLEAN_AIR_FACTOR                      # divided by RO_CLEAN_AIR_FACTOR yields the Ro 
+			return val1;           
+	def MQRead_mq_135(mq_135):
+		rs1 = 0.0
+		for i in range(READ_SAMPLE_TIMES):
+			rs1 += MQResistanceCalculation(mq_135)
+			time.sleep(READ_SAMPLE_INTERVAL/1000.0)
+			rs1 = rs1/READ_SAMPLE_TIMES
+			return rs1        
+	def MQPercentage_mq_135(mq_135):	        
+		valx = {}
+		read = MQRead(mq_135)
+		valx["GAS_CO2"]  = MQGetGasPercentage(read/Ro2, GAS_CO2)
+		return valx
+	def MQGetPercentage(rs_ro_ratio, pcurve):
+		return (math.pow(10,( ((math.log(rs_ro_ratio)-pcurve[1])/ pcurve[2]) + pcurve[0])))        
+	def MQGetGasPercentage(rs_ro_ratio, gas_id):        
+		if ( gas_id == GAS_LPG ):            
+			return MQGetPercentage(rs_ro_ratio, LPGCurve)        
+		elif ( gas_id == GAS_CO ):	           
+			return MQGetPercentage(rs_ro_ratio, COCurve)        
+		elif ( gas_id == GAS_SMOKE ):            
+			return MQGetPercentage(rs_ro_ratio, SmokeCurve)
+		elif ( gas_id == GAS_CO2 ):            
+			return MQGetPercentage(rs_ro_ratio, CO2Curve)    
+		return 0   
+
+	print("Calibrating...sensor 2")
+	Ro2 = MQCalibration_mq_135(mq_135)    # Ro resistance of Hydrogen for Mq2
+	print("Calibration is done...\n")
+	print("Ro2=%0.3f Kohm" %Ro2)
+	print "&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&"
+	print "----------------------------------------"
+	time.sleep(1)
+	print("Ro2=%0.3f kohm" %Ro2)
+	print "----------------------------------------"
+	print "----------------------------------------"
+	print "----------------------------------------"
+
+	while True:
+		perx = MQPercentage_mq_135(mq_135)
+		sys.stdout.write("\r")
+		sys.stdout.write("\033[K")
+		sys.stdout.write("Co2 Gas: %g ppm " % (perx["GAS_CO2"]))
+		zl =perx["GAS_CO2"]
+		print (zl)
+		print "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
+		time.sleep(1)
+		payload={'Smoke_Value': perx["GAS_CO2"]}
+		break
+	return (payload)
+
+
+i=0
+temp=0
+while 1:
+	print("--------------buttons calling____________________")
+	buttons();
+	a=Netmaxiot.analogRead(0)       #Analog sensors plug in to Netmaxiot Sheild
+	b=Netmaxiot.analogRead(1)
+	atemp=a*0.489
+	blight=b/10.23
+	atemp=round(atemp,2)
+	blight=round(blight,2)
+	temp=temp+atemp
+	if(i==10) :
+		temp=temp/10
+		aio.send('TEMPERATURE', temp)
+		print "temp -----:"+str(temp)
+		i=0
+	i=i+1;
+	print "I :"+str(i)
+	aio.send('LIGHT', blight)
+	print "temp :"+str(atemp)
+	print "light :"+str(blight)
+	smoke=smoke_detector()
+	aio.send('SMOKE',smoke)
+	print "smoke : "+str(smoke)
+	time.sleep(1)
+
